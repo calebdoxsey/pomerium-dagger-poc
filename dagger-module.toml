@@ -1,0 +1,5 @@
+name = "pomerium"
+engineVersion = "v1.0.0-beta.30"
+
+[runtime]
+  source = "go"
