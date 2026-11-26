@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"dagger/pomerium/internal/dagger"
 )
 
 const vulnDBIndexURL = "https://vuln.go.dev/index/db.json"
@@ -32,12 +34,9 @@ func (m *Pomerium) Govulncheck(ctx context.Context) error {
 		// shared engine. On pomerium the peak drops from ~12GB to ~8.4GB for a few
 		// seconds; lower limits thrash (6GiB: 7.9GB peak, 3x slower).
 		WithEnvVariable("GOMEMLIMIT", "8GiB").
-		WithExec([]string{"sh", "-euc", `
-for dir in $(go list -m -f '{{.Dir}}'); do
-	echo "==> govulncheck $dir"
-	(cd "$dir" && govulncheck ./...)
-done
-`}).
+		With(func(c *dagger.Container) *dagger.Container {
+			return withScript(c, "govulncheck.sh")
+		}).
 		Sync(ctx)
 	return err
 }

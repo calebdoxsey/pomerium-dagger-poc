@@ -1,0 +1,6 @@
+repos:
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      # Runs the koalaman/shellcheck image, so it needs Docker.
+      - id: shellcheck

@@ -30,17 +30,7 @@ runs:
         DAGGER_CA_CERT: ${{ inputs.engine-ca-cert }}
         DAGGER_CLIENT_CERT: ${{ inputs.engine-client-cert }}
         DAGGER_CLIENT_KEY: ${{ inputs.engine-client-key }}
-      run: |
-        if [ -z "$DAGGER_CLIENT_KEY" ]; then
-          echo "No engine credentials; using a local engine."
-          exit 0
-        fi
-        d="$RUNNER_TEMP/dagger-tls"
-        mkdir -p "$d"
-        printf '%s\n' "$DAGGER_CA_CERT" > "$d/ca.crt"
-        printf '%s\n' "$DAGGER_CLIENT_CERT" > "$d/client.crt"
-        (umask 077 && printf '%s\n' "$DAGGER_CLIENT_KEY" > "$d/client.key")
-        echo "DAGGER_ENGINE=tls://$DAGGER_ADDR?ca_path=$d/ca.crt&cert_path=$d/client.crt&key_path=$d/client.key" >> "$GITHUB_ENV"
+      run: bash "$GITHUB_ACTION_PATH/scripts/use-engine.sh"
 
     # Install the Dagger CLI ourselves instead of with dagger/dagger-for-github, so it can be
     # cached: that action can't detect an installed 1.0 CLI and always downloads it again.
@@ -53,17 +43,7 @@ runs:
         RUNNER_ARCH: ${{ runner.arch }}
         RUNNER_OS: ${{ runner.os }}
         TOOL_CACHE: ${{ runner.tool_cache }}
-      run: |
-        case "$RUNNER_OS/$RUNNER_ARCH" in
-          Linux/X64) platform=linux_amd64 ;;
-          Linux/ARM64) platform=linux_arm64 ;;
-          *) echo "::error::unsupported runner: $RUNNER_OS/$RUNNER_ARCH"; exit 1 ;;
-        esac
-        {
-          echo "version=$DAGGER_VERSION"
-          echo "platform=$platform"
-          echo "dir=$TOOL_CACHE/dagger/$DAGGER_VERSION/$platform"
-        } >> "$GITHUB_OUTPUT"
+      run: bash "$GITHUB_ACTION_PATH/scripts/select-cli.sh"
 
     - name: Cache Dagger CLI
       id: cache
@@ -79,16 +59,7 @@ runs:
         DAGGER_VERSION: ${{ steps.dagger.outputs.version }}
         PLATFORM: ${{ steps.dagger.outputs.platform }}
         DIR: ${{ steps.dagger.outputs.dir }}
-      run: |
-        archive="dagger_${DAGGER_VERSION}_${PLATFORM}.tar.gz"
-        base="https://dl.dagger.io/dagger/releases/${DAGGER_VERSION#v}"
-        tmp="$(mktemp -d)"
-        curl -fsSL --retry 3 -o "$tmp/$archive" "$base/$archive"
-        curl -fsSL --retry 3 -o "$tmp/checksums.txt" "$base/checksums.txt"
-        (cd "$tmp" && grep " $archive\$" checksums.txt | sha256sum -c -)
-        mkdir -p "$DIR"
-        tar -xzf "$tmp/$archive" -C "$DIR" dagger
-        rm -rf "$tmp"
+      run: bash "$GITHUB_ACTION_PATH/scripts/install-cli.sh"
 
     - name: Run Dagger
       shell: bash
@@ -99,10 +70,4 @@ runs:
         # Without a terminal Dagger defaults to "report": a heartbeat and a
         # summary at the end. "logs" streams each command's output as it runs.
         DAGGER_PROGRESS: logs
-      run: |
-        echo "$DIR" >> "$GITHUB_PATH"
-        "$DIR/dagger" version
-        # ARGS is split on whitespace (without globbing) into separate arguments.
-        set -f
-        # shellcheck disable=SC2086
-        "$DIR/dagger" "$VERB" $ARGS
+      run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"
