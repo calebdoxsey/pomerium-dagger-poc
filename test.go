@@ -39,10 +39,12 @@ for v in $(env | sed -n 's/^\(OTEL_[A-Z_]*\)=.*/\1/p') TRACEPARENT; do
 	unset "$v"
 done
 
-mkdir -p /tmp/coverdata
+# -coverprofile (unlike -test.gocoverdir) keeps go's test cache working, so
+# only packages affected by a change run again. The trade-off: tests rerun by
+# --rerun-fails overwrite the profile, so after a flaky failure the coverage
+# only reflects the rerun.
 gotestsum --rerun-fails --packages=./... -- \
-	-race -cover -args -test.gocoverdir=/tmp/coverdata
-go tool covdata textfmt -i=/tmp/coverdata -o /tmp/coverage.txt
+	-race -coverprofile=/tmp/coverage.txt
 sed -i \
 	-e '/\.pb\.go\:/d' \
 	-e '/\/mock_.*\.go\:/d' \

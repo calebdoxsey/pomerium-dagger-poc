@@ -96,6 +96,9 @@ runs:
         DIR: ${{ steps.dagger.outputs.dir }}
         VERB: ${{ inputs.verb }}
         ARGS: ${{ inputs.args }}
+        # Without a terminal Dagger defaults to "report": a heartbeat and a
+        # summary at the end. "logs" streams each command's output as it runs.
+        DAGGER_PROGRESS: logs
       run: |
         echo "$DIR" >> "$GITHUB_PATH"
         "$DIR/dagger" version
