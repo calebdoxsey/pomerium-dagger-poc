@@ -28,6 +28,10 @@ func (m *Pomerium) Govulncheck(ctx context.Context) error {
 		// Dagger can't see. Make the database version part of the cache key so
 		// a cached result is never reused after new vulnerabilities are published.
 		WithEnvVariable("GOVULNDB_MODIFIED", vulnDBModified(ctx)).
+		// Make the Go GC work harder so the scan fits alongside other work on a
+		// shared engine. On pomerium the peak drops from ~12GB to ~8.4GB for a few
+		// seconds; lower limits thrash (6GiB: 7.9GB peak, 3x slower).
+		WithEnvVariable("GOMEMLIMIT", "8GiB").
 		WithExec([]string{"sh", "-euc", `
 for dir in $(go list -m -f '{{.Dir}}'); do
 	echo "==> govulncheck $dir"
