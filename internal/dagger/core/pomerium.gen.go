@@ -17,10 +17,11 @@ type Pomerium struct { // pomerium (../../../:0:0)
 	// field again.
 	refetchID bool
 
-	govulncheck *Void
-	id          *ID
-	lint        *Void
-	test        *Void
+	buildWindows *Void
+	govulncheck  *Void
+	id           *ID
+	lint         *Void
+	test         *Void
 }
 
 func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
@@ -36,6 +37,17 @@ func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
 // ID is id, selects, knowing that ID (Loaded).
 func (r *Pomerium) withLoadedID(q *querybuilder.Selection, id ID) *Pomerium {
 	return &Pomerium{query: q, id: &id}
+}
+
+// BuildWindows cross-compiles the repository for Windows (amd64 and arm64),
+// except Unix-only server packages and anything importing them.
+func (r *Pomerium) BuildWindows(ctx context.Context) error {
+	if r.buildWindows != nil {
+		return nil
+	}
+	q := r.query.Select("buildWindows")
+
+	return q.Execute(ctx)
 }
 
 // Cover runs the Go tests like Test and returns the coverage profile.

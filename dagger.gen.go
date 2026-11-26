@@ -173,6 +173,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Pomerium":
 		switch fnName {
+		case "BuildWindows":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Pomerium).BuildWindows(&parent, ctx)
 		case "Cover":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -237,6 +244,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithDescription("Shared CI/build functions for Pomerium repositories.\n\nEach Pomerium repository installs this module into its Dagger workspace\n(dagger.toml) and runs its checks with `dagger check`, both locally and in CI.\n").
 			WithObject(
 				dag.TypeDef().WithObject("Pomerium", dagger.TypeDefWithObjectOpts{Description: "Pomerium is the root object of the module.", SourceMap: dag.SourceMap("main.go", 12, 6)}).
+					WithFunction(
+						dag.Function("BuildWindows",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("BuildWindows cross-compiles the repository for Windows (amd64 and arm64),\nexcept Unix-only server packages and anything importing them.").
+							WithSourceMap(dag.SourceMap("windows.go", 17, 1)).
+							WithCheck()).
 					WithFunction(
 						dag.Function("Cover",
 							dag.TypeDef().WithObject("File")).
