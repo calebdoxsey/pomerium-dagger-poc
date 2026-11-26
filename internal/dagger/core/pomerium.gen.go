@@ -20,6 +20,7 @@ type Pomerium struct { // pomerium (../../../:0:0)
 	govulncheck *Void
 	id          *ID
 	lint        *Void
+	test        *Void
 }
 
 func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
@@ -35,6 +36,16 @@ func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
 // ID is id, selects, knowing that ID (Loaded).
 func (r *Pomerium) withLoadedID(q *querybuilder.Selection, id ID) *Pomerium {
 	return &Pomerium{query: q, id: &id}
+}
+
+// Cover runs the Go tests like Test and returns the coverage profile.
+func (r *Pomerium) Cover() *File {
+	q := r.query.Select("cover")
+
+	return &File{
+		query:     q,
+		refetchID: r.refetchID,
+	}
 }
 
 // GoBase returns a container with the Go toolchain installed, the prepared
@@ -143,6 +154,17 @@ func (r *Pomerium) Prepare() *Directory {
 		query:     q,
 		refetchID: r.refetchID,
 	}
+}
+
+// Test runs the Go tests (with the race detector) for the repository's main
+// module.
+func (r *Pomerium) Test(ctx context.Context) error {
+	if r.test != nil {
+		return nil
+	}
+	q := r.query.Select("test")
+
+	return q.Execute(ctx)
 }
 
 func (r *Query) Pomerium(ws *Workspace) *Pomerium { // pomerium (../../../:0:0)

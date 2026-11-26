@@ -173,6 +173,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Pomerium":
 		switch fnName {
+		case "Cover":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return (*Pomerium).Cover(&parent, ctx)
 		case "GoBase":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -201,6 +208,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return (*Pomerium).Prepare(&parent, ctx)
+		case "Test":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Pomerium).Test(&parent, ctx)
 		case "":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -224,6 +238,11 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithObject(
 				dag.TypeDef().WithObject("Pomerium", dagger.TypeDefWithObjectOpts{Description: "Pomerium is the root object of the module.", SourceMap: dag.SourceMap("main.go", 12, 6)}).
 					WithFunction(
+						dag.Function("Cover",
+							dag.TypeDef().WithObject("File")).
+							WithDescription("Cover runs the Go tests like Test and returns the coverage profile.").
+							WithSourceMap(dag.SourceMap("test.go", 23, 1))).
+					WithFunction(
 						dag.Function("GoBase",
 							dag.TypeDef().WithObject("Container")).
 							WithDescription("GoBase returns a container with the Go toolchain installed, the prepared\nsource mounted at /src and the Go module and build caches attached.\n\nThe Go version is goVersion. Go won't download a different toolchain, so a\nrepository whose go.mod requires a newer Go fails instead.").
@@ -246,6 +265,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							dag.TypeDef().WithObject("Directory")).
 							WithDescription("Prepare returns the source with any build dependencies that are not checked\ninto git fetched (the equivalent of `make deps-build`).\n\nCurrently this downloads the embedded envoy binaries for repositories that\ncontain pkg/envoy/get-envoy.").
 							WithSourceMap(dag.SourceMap("prepare.go", 14, 1))).
+					WithFunction(
+						dag.Function("Test",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Test runs the Go tests (with the race detector) for the repository's main\nmodule.").
+							WithSourceMap(dag.SourceMap("test.go", 13, 1)).
+							WithCheck()).
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Pomerium")).
