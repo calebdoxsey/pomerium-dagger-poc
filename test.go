@@ -41,7 +41,7 @@ done
 
 mkdir -p /tmp/coverdata
 gotestsum --rerun-fails --packages=./... -- \
-	-p "$TEST_PARALLELISM" -race -cover -args -test.gocoverdir=/tmp/coverdata
+	-race -cover -args -test.gocoverdir=/tmp/coverdata
 go tool covdata textfmt -i=/tmp/coverdata -o /tmp/coverage.txt
 sed -i \
 	-e '/\.pb\.go\:/d' \
