@@ -23,7 +23,7 @@ func (m *Pomerium) Govulncheck(ctx context.Context) error {
 		return err
 	}
 	_, err = ctr.
-		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@" + m.GovulncheckVersion}).
+		WithExec([]string{"go", "install", "golang.org/x/vuln/cmd/govulncheck@" + govulncheckVersion}).
 		// govulncheck downloads the vulnerability database at run time, which
 		// Dagger can't see. Make the database version part of the cache key so
 		// a cached result is never reused after new vulnerabilities are published.

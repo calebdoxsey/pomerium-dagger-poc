@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-// daggerVersion is the Dagger version every Pomerium repository uses: the CLI
-// locally and in CI, and the shared CI engine. Keep it in sync with the version
-// in actions/run/action.yml (enforced by version_test.go) and the engine deployment.
-const daggerVersion = "v1.0.0-beta.30"
-
 // requireEngineVersion fails unless the Dagger engine running this module is
 // daggerVersion.
 //

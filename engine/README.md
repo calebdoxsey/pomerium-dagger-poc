@@ -115,7 +115,7 @@ local engine, as it would without this setup.
 ## Upgrading Dagger
 
 The chart, the engine and the CLI must be the same version: `daggerVersion` in
-`../version.go`. Every check fails if the engine it runs on is a different
+`../versions.go`. Every check fails if the engine it runs on is a different
 version. To upgrade:
 
 1. Change `daggerVersion` and the `version` in `../actions/run/action.yml`

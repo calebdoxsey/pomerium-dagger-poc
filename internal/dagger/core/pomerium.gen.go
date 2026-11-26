@@ -19,6 +19,7 @@ type Pomerium struct { // pomerium (../../../:0:0)
 
 	govulncheck *Void
 	id          *ID
+	lint        *Void
 }
 
 func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
@@ -39,8 +40,8 @@ func (r *Pomerium) withLoadedID(q *querybuilder.Selection, id ID) *Pomerium {
 // GoBase returns a container with the Go toolchain installed, the prepared
 // source mounted at /src and the Go module and build caches attached.
 //
-// The Go version is read from the "golang" entry in the repository's
-// .tool-versions file.
+// The Go version is goVersion. Go won't download a different toolchain, so a
+// repository whose go.mod requires a newer Go fails instead.
 func (r *Pomerium) GoBase() *Container {
 	q := r.query.Select("goBase")
 
@@ -118,6 +119,18 @@ func (r *Pomerium) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
+// Lint runs golangci-lint on the repository.
+//
+// The golangci-lint version is golangciLintVersion.
+func (r *Pomerium) Lint(ctx context.Context) error {
+	if r.lint != nil {
+		return nil
+	}
+	q := r.query.Select("lint")
+
+	return q.Execute(ctx)
+}
+
 // Prepare returns the source with any build dependencies that are not checked
 // into git fetched (the equivalent of `make deps-build`).
 //
@@ -132,23 +145,9 @@ func (r *Pomerium) Prepare() *Directory {
 	}
 }
 
-// PomeriumOpts contains options for Query.Pomerium
-type PomeriumOpts struct {
-	// govulncheck version used by the govulncheck check.
-	//
-	// Default: "v1.5.0"
-	GovulncheckVersion string
-}
-
-func (r *Query) Pomerium(ws *Workspace, opts ...PomeriumOpts) *Pomerium { // pomerium (../../../:0:0)
+func (r *Query) Pomerium(ws *Workspace) *Pomerium { // pomerium (../../../:0:0)
 	assertNotNil("ws", ws)
 	q := r.query.Select("pomerium")
-	for i := len(opts) - 1; i >= 0; i-- {
-		// `govulncheckVersion` optional argument
-		if !querybuilder.IsZeroValue(opts[i].GovulncheckVersion) {
-			q = q.Arg("govulncheckVersion", opts[i].GovulncheckVersion)
-		}
-	}
 	q = q.Arg("ws", ws)
 
 	return &Pomerium{

@@ -10,27 +10,30 @@ import (
 
 // Pomerium is the root object of the module.
 type Pomerium struct {
-	// The repository source: the workspace root, filtered by .gitignore.
+	// The repository source: the workspace root, minus sourceExclude.
 	// +private
 	Source *dagger.Directory
+}
 
-	// govulncheck version used by the govulncheck check.
-	// +private
-	GovulncheckVersion string
+// sourceExclude lists large local-only paths to leave out of the source.
+//
+// .gitignore isn't applied: Dagger filters by the patterns alone, which also
+// drops tracked files that match them (in pomerium, .golangci.yml and dozens of
+// test fixtures). A CI checkout only has tracked files, so there this is the
+// exact checkout; locally, untracked files are included too.
+var sourceExclude = []string{
+	".git",
+	"**/node_modules",
+	"bin",
+	// downloaded by Prepare
+	"pkg/envoy/files/envoy-*",
 }
 
 func New(
 	// The current workspace, auto-populated by Dagger.
 	ws *dagger.Workspace,
-	// govulncheck version used by the govulncheck check.
-	// +default="v1.5.0"
-	govulncheckVersion string,
 ) *Pomerium {
 	return &Pomerium{
-		Source: ws.Directory("/", dagger.WorkspaceDirectoryOpts{
-			Exclude:   []string{".git"},
-			Gitignore: true,
-		}),
-		GovulncheckVersion: govulncheckVersion,
+		Source: ws.Directory("/", dagger.WorkspaceDirectoryOpts{Exclude: sourceExclude}),
 	}
 }

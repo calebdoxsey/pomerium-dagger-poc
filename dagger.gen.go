@@ -61,25 +61,21 @@ func convertSlice[I any, O any](in []I, f func(I) O) []O {
 
 func (r Pomerium) MarshalJSON() ([]byte, error) {
 	var concrete struct {
-		Source             *dagger.Directory
-		GovulncheckVersion string
+		Source *dagger.Directory
 	}
 	concrete.Source = r.Source
-	concrete.GovulncheckVersion = r.GovulncheckVersion
 	return json.Marshal(&concrete)
 }
 
 func (r *Pomerium) UnmarshalJSON(bs []byte) error {
 	var concrete struct {
-		Source             *dagger.Directory
-		GovulncheckVersion string
+		Source *dagger.Directory
 	}
 	err := json.Unmarshal(bs, &concrete)
 	if err != nil {
 		return err
 	}
 	r.Source = concrete.Source
-	r.GovulncheckVersion = concrete.GovulncheckVersion
 	return nil
 }
 
@@ -191,6 +187,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return nil, (*Pomerium).Govulncheck(&parent, ctx)
+		case "Lint":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Pomerium).Lint(&parent, ctx)
 		case "Prepare":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -211,14 +214,7 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg ws", err))
 				}
 			}
-			var govulncheckVersion string
-			if inputArgs["govulncheckVersion"] != nil {
-				err = json.Unmarshal([]byte(inputArgs["govulncheckVersion"]), &govulncheckVersion)
-				if err != nil {
-					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg govulncheckVersion", err))
-				}
-			}
-			return New(ws, govulncheckVersion), nil
+			return New(ws), nil
 		default:
 			return nil, fmt.Errorf("unknown function %s", fnName)
 		}
@@ -230,14 +226,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("GoBase",
 							dag.TypeDef().WithObject("Container")).
-							WithDescription("GoBase returns a container with the Go toolchain installed, the prepared\nsource mounted at /src and the Go module and build caches attached.\n\nThe Go version is read from the \"golang\" entry in the repository's\n.tool-versions file.").
-							WithSourceMap(dag.SourceMap("golang.go", 17, 1))).
+							WithDescription("GoBase returns a container with the Go toolchain installed, the prepared\nsource mounted at /src and the Go module and build caches attached.\n\nThe Go version is goVersion. Go won't download a different toolchain, so a\nrepository whose go.mod requires a newer Go fails instead.").
+							WithSourceMap(dag.SourceMap("golang.go", 14, 1))).
 					WithFunction(
 						dag.Function("Govulncheck",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
 							WithDescription("Govulncheck scans every module in the Go workspace for known vulnerabilities.\n\nThe scan is cached until the source, the toolchain or the vulnerability\ndatabase changes.").
 							WithCachePolicy(dagger.FunctionCachePolicyNever).
 							WithSourceMap(dag.SourceMap("govulncheck.go", 20, 1)).
+							WithCheck()).
+					WithFunction(
+						dag.Function("Lint",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("Lint runs golangci-lint on the repository.\n\nThe golangci-lint version is golangciLintVersion.").
+							WithSourceMap(dag.SourceMap("lint.go", 12, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Prepare",
@@ -247,9 +249,8 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithConstructor(
 						dag.Function("New",
 							dag.TypeDef().WithObject("Pomerium")).
-							WithSourceMap(dag.SourceMap("main.go", 22, 1)).
-							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{Description: "The current workspace, auto-populated by Dagger.", SourceMap: dag.SourceMap("main.go", 24, 2)}).
-							WithArg("govulncheckVersion", dag.TypeDef().WithKind(dagger.TypeDefKindStringKind), dagger.FunctionWithArgOpts{Description: "govulncheck version used by the govulncheck check.", SourceMap: dag.SourceMap("main.go", 27, 2), DefaultValue: dagger.JSON("\"v1.5.0\"")}))), nil
+							WithSourceMap(dag.SourceMap("main.go", 32, 1)).
+							WithArg("ws", dag.TypeDef().WithObject("Workspace"), dagger.FunctionWithArgOpts{Description: "The current workspace, auto-populated by Dagger.", SourceMap: dag.SourceMap("main.go", 34, 2)}))), nil
 	default:
 		return nil, fmt.Errorf("unknown object %s", parentName)
 	}

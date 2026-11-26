@@ -8,6 +8,3 @@ import (
 
 // Pomerium is the root object of the module.
 type Pomerium = core.Pomerium
-
-// PomeriumOpts contains options for Query.Pomerium
-type PomeriumOpts = core.PomeriumOpts

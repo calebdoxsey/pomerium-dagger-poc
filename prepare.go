@@ -25,7 +25,6 @@ func (m *Pomerium) Prepare(ctx context.Context) (*dagger.Directory, error) {
 	// itself changes, rather than re-running on every source change.
 	getEnvoySource := m.Source.Filter(dagger.DirectoryFilterOpts{
 		Include: []string{
-			".tool-versions",
 			"**/go.mod",
 			"**/go.sum",
 			"go.work",
