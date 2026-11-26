@@ -173,6 +173,13 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 	switch parentName {
 	case "Pomerium":
 		switch fnName {
+		case "BuildDocker":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			return nil, (*Pomerium).BuildDocker(&parent, ctx)
 		case "BuildWindows":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -244,6 +251,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 			WithDescription("Shared CI/build functions for Pomerium repositories.\n\nEach Pomerium repository installs this module into its Dagger workspace\n(dagger.toml) and runs its checks with `dagger check`, both locally and in CI.\n").
 			WithObject(
 				dag.TypeDef().WithObject("Pomerium", dagger.TypeDefWithObjectOpts{Description: "Pomerium is the root object of the module.", SourceMap: dag.SourceMap("main.go", 12, 6)}).
+					WithFunction(
+						dag.Function("BuildDocker",
+							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
+							WithDescription("BuildDocker builds the repository's Dockerfile, without publishing the image.\n\nThe engine's BuildKit runs the build, so its layers and the Dockerfile's\ncache mounts stay on the engine between runs.").
+							WithSourceMap(dag.SourceMap("docker.go", 13, 1)).
+							WithCheck()).
 					WithFunction(
 						dag.Function("BuildWindows",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).

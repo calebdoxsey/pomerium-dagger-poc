@@ -17,6 +17,7 @@ type Pomerium struct { // pomerium (../../../:0:0)
 	// field again.
 	refetchID bool
 
+	buildDocker  *Void
 	buildWindows *Void
 	govulncheck  *Void
 	id           *ID
@@ -37,6 +38,19 @@ func (r *Pomerium) WithGraphQLQuery(q *querybuilder.Selection) *Pomerium {
 // ID is id, selects, knowing that ID (Loaded).
 func (r *Pomerium) withLoadedID(q *querybuilder.Selection, id ID) *Pomerium {
 	return &Pomerium{query: q, id: &id}
+}
+
+// BuildDocker builds the repository's Dockerfile, without publishing the image.
+//
+// The engine's BuildKit runs the build, so its layers and the Dockerfile's
+// cache mounts stay on the engine between runs.
+func (r *Pomerium) BuildDocker(ctx context.Context) error {
+	if r.buildDocker != nil {
+		return nil
+	}
+	q := r.query.Select("buildDocker")
+
+	return q.Execute(ctx)
 }
 
 // BuildWindows cross-compiles the repository for Windows (amd64 and arm64),

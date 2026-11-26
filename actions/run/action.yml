@@ -68,6 +68,9 @@ runs:
         VERB: ${{ inputs.verb }}
         ARGS: ${{ inputs.args }}
         # Without a terminal Dagger defaults to "report": a heartbeat and a
-        # summary at the end. "logs" streams each command's output as it runs.
-        DAGGER_PROGRESS: logs
+        # summary at the end. "plain" streams each step and its output as it
+        # runs. (Not "logs": it drops failed steps' output, leaving only
+        # "exit code: 1".)
+        DAGGER_PROGRESS: plain
+        DAGGER_NO_NAG: "1"
       run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"
