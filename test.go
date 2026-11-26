@@ -49,8 +49,13 @@ sed -i \
 	-e '/\.pb\.go\:/d' \
 	-e '/\/mock_.*\.go\:/d' \
 	-e '/\.gen\.go\:/d' \
-	-e '/\/internal\/testenv\/:/d' \
-	-e '/\/internal\/testutil\/:/d' \
+	-e '/\/internal\/testenv\//d' \
+	-e '/\/internal\/testutil\//d' \
+	-e '/\/internal\/tests\//d' \
+	-e '/\/storagetest\//d' \
+	-e '/\/integration\//d' \
+	-e '/\/examples\//d' \
+	-e '/\/ssh\/test\//d' \
 	/tmp/coverage.txt
 `}).
 		File("/tmp/coverage.txt"), nil
