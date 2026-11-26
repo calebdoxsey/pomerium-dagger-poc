@@ -74,7 +74,10 @@ func dockerService() *dagger.Service {
 		}).
 		WithExposedPort(2375).
 		AsService(dagger.ContainerAsServiceOpts{
-			Args:                     []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"},
+			// dockerd logs every container start and stop at info level, which
+			// floods the CI log; warn keeps real problems. (Its startup warnings
+			// about the unencrypted API are expected: only the tests can reach it.)
+			Args:                     []string{"dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false", "--log-level=warn"},
 			UseEntrypoint:            true,
 			InsecureRootCapabilities: true,
 		})
