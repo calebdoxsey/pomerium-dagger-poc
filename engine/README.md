@@ -85,38 +85,44 @@ retrying, and the engine logs `tls: client didn't provide a certificate`.
 
 ### 6. GitHub configuration
 
-In each repository (or once for the organization), add:
+In each repository (or once for the organization), add the secrets
+`DAGGER_CA_CERT` (`ca.crt`), `DAGGER_CLIENT_CERT` (`client.crt`) and
+`DAGGER_CLIENT_KEY` (`client.key`).
 
-- Secrets: `DAGGER_ENGINE_CA` (`ca.crt`), `DAGGER_ENGINE_CLIENT_CERT`
-  (`client.crt`) and `DAGGER_ENGINE_CLIENT_KEY` (`client.key`).
-- Variable: `DAGGER_ENGINE_HOST`, the engine's hostname.
-
-Add this step to each workflow before the Dagger step, and set
-`timeout-minutes` on the job, because a rejected certificate hangs instead of
-failing:
+Workflows run Dagger through this repository's action (`../actions/run/action.yml`), which
+connects to the shared engine and installs the matching Dagger version. Pin it
+to a commit, and set `timeout-minutes` on the job, because a rejected
+certificate hangs instead of failing:
 
 ```yaml
-      - name: Use the shared Dagger engine
-        env:
-          CA: ${{ secrets.DAGGER_ENGINE_CA }}
-          CERT: ${{ secrets.DAGGER_ENGINE_CLIENT_CERT }}
-          KEY: ${{ secrets.DAGGER_ENGINE_CLIENT_KEY }}
-          HOST: ${{ vars.DAGGER_ENGINE_HOST }}
-        run: |
-          if [ -z "$CA" ]; then echo "No engine credentials (e.g. fork PR); using a local engine."; exit 0; fi
-          d="$RUNNER_TEMP/dagger-engine"; mkdir -p "$d"; umask 077
-          printf '%s\n' "$CA" > "$d/ca.crt"; printf '%s\n' "$CERT" > "$d/client.crt"; printf '%s\n' "$KEY" > "$d/client.key"
-          echo "DAGGER_ENGINE=tls://$HOST:1234?ca_path=$d/ca.crt&cert_path=$d/client.crt&key_path=$d/client.key" >> "$GITHUB_ENV"
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: calebdoxsey/pomerium-dagger-poc/actions/run@<commit>
+        with:
+          args: --check govulncheck
+          engine-ca-cert: ${{ secrets.DAGGER_CA_CERT }}
+          engine-client-cert: ${{ secrets.DAGGER_CLIENT_CERT }}
+          engine-client-key: ${{ secrets.DAGGER_CLIENT_KEY }}
 ```
 
-Fork pull requests do not receive secrets. They skip this step and use a
-temporary local engine, as they would without this setup.
+Fork pull requests do not receive secrets. The action then uses a temporary
+local engine, as it would without this setup.
 
 ## Upgrading Dagger
 
-The chart, the engine and the CLI must be the same version. The CLI version
-comes from `dagger` in each repository's `.tool-versions`. Upgrade the Helm
-release (`--version`) together with that change.
+The chart, the engine and the CLI must be the same version: `daggerVersion` in
+`../version.go`. Every check fails if the engine it runs on is a different
+version. To upgrade:
+
+1. Change `daggerVersion` and the `version` in `../actions/run/action.yml`
+   (`go test ./...` fails if they differ).
+2. Upgrade the Helm release (`--version`) or engine deployment.
+3. Update each repository to the new commit of this action and module
+   (`dagger lock update`).
 
 ## Security
 

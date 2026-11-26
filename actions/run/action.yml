@@ -1,0 +1,49 @@
+name: Pomerium Dagger
+description: >-
+  Runs a Dagger command on the shared Pomerium CI engine. Without engine 
+  credentials it runs on a temporary local engine instead.
+
+inputs:
+  verb:
+    description: Dagger CLI command, such as check or generate.
+    default: check
+  args:
+    description: Arguments for the command, for example `--check govulncheck`.
+    default: ""
+  engine-ca-cert:
+    description: CA certificate of the shared engine. Pass secrets.DAGGER_CA_CERT.
+    default: ""
+  engine-client-cert:
+    description: Client certificate for the shared engine. Pass secrets.DAGGER_CLIENT_CERT.
+    default: ""
+  engine-client-key:
+    description: Client key for the shared engine. Pass secrets.DAGGER_CLIENT_KEY.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Use the shared Dagger engine
+      shell: bash
+      env:
+        DAGGER_ADDR: dagger.doxsey.net
+        DAGGER_CA_CERT: ${{ inputs.engine-ca-cert }}
+        DAGGER_CLIENT_CERT: ${{ inputs.engine-client-cert }}
+        DAGGER_CLIENT_KEY: ${{ inputs.engine-client-key }}
+      run: |
+        if [ -z "$DAGGER_CLIENT_KEY" ]; then
+          echo "No engine credentials; using a local engine."
+          exit 0
+        fi
+        d="$RUNNER_TEMP/dagger-tls"
+        mkdir -p "$d"
+        printf '%s\n' "$DAGGER_CA_CERT" > "$d/ca.crt"
+        printf '%s\n' "$DAGGER_CLIENT_CERT" > "$d/client.crt"
+        (umask 077 && printf '%s\n' "$DAGGER_CLIENT_KEY" > "$d/client.key")
+        echo "DAGGER_ENGINE=tls://$DAGGER_ADDR?ca_path=$d/ca.crt&cert_path=$d/client.crt&key_path=$d/client.key" >> "$GITHUB_ENV"
+
+    - uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77 # v8.4.1
+      with:
+        version: v1.0.0-beta.30
+        verb: ${{ inputs.verb }}
+        args: ${{ inputs.args }}

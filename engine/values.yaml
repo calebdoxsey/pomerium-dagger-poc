@@ -1,7 +1,6 @@
 # Helm values for a self-hosted Dagger engine used by CI. See README.md.
 #
-# Install with the chart version that matches the dagger CLI version in
-# .tool-versions:
+# Install with the chart version that matches daggerVersion in ../version.go:
 #
 #   helm upgrade --install --namespace dagger checks oci://registry.dagger.io/dagger-helm \
 #     --version 1.0.0-beta.30 -f values.yaml
