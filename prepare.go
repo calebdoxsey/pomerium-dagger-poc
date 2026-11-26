@@ -20,7 +20,21 @@ func (m *Pomerium) Prepare(ctx context.Context) (*dagger.Directory, error) {
 		return m.Source, nil
 	}
 
-	ctr, err := m.goContainer(ctx, m.Source)
+	// Only give get-envoy the files it needs to build and run, so the download
+	// stays cached until the envoy version (pinned in go.mod) or the tool
+	// itself changes, rather than re-running on every source change.
+	getEnvoySource := m.Source.Filter(dagger.DirectoryFilterOpts{
+		Include: []string{
+			".tool-versions",
+			"**/go.mod",
+			"**/go.sum",
+			"go.work",
+			"go.work.sum",
+			"pkg/envoy/envoyversion/**",
+			"pkg/envoy/get-envoy/**",
+		},
+	})
+	ctr, err := m.goContainer(ctx, getEnvoySource)
 	if err != nil {
 		return nil, err
 	}

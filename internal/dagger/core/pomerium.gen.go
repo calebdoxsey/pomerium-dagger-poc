@@ -51,6 +51,9 @@ func (r *Pomerium) GoBase() *Container {
 }
 
 // Govulncheck scans every module in the Go workspace for known vulnerabilities.
+//
+// The scan is cached until the source, the toolchain or the vulnerability
+// database changes.
 func (r *Pomerium) Govulncheck(ctx context.Context) error {
 	if r.govulncheck != nil {
 		return nil

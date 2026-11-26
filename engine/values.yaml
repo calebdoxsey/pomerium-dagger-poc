@@ -1,0 +1,51 @@
+# Helm values for a self-hosted Dagger engine used by CI. See README.md.
+#
+# Install with the chart version that matches the dagger CLI version in
+# .tool-versions:
+#
+#   helm upgrade --install --namespace dagger checks oci://registry.dagger.io/dagger-helm \
+#     --version 1.0.0-beta.30 -f values.yaml
+
+engine:
+  kind: StatefulSet
+  port: 1234
+  # Require client certificates on the TCP listener (mutual TLS).
+  args:
+    - --tlscert
+    - /certs/tls.crt
+    - --tlskey
+    - /certs/tls.key
+    - --tlscacert
+    - /certs/ca.crt
+  volumes:
+    - name: certs
+      secret:
+        secretName: dagger-engine-tls
+  volumeMounts:
+    - name: certs
+      mountPath: /certs
+      readOnly: true
+  statefulSet:
+    persistentVolumeClaim:
+      enabled: true
+      # storageClassName: fast-ssd
+      resources:
+        requests:
+          storage: 200Gi
+  hostPath:
+    dataVolume:
+      enabled: false
+  # Run on dedicated nodes. Uncomment and match your node pool's label and taint.
+  # nodeSelector:
+  #   dagger-pool: checks
+  # tolerations:
+  #   - key: dagger
+  #     operator: Exists
+  #     effect: NoSchedule
+  # Size these for your nodes; Go builds and govulncheck are CPU and memory heavy.
+  resources:
+    requests:
+      cpu: "4"
+      memory: 16Gi
+service:
+  type: LoadBalancer

@@ -235,8 +235,9 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("Govulncheck",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithDescription("Govulncheck scans every module in the Go workspace for known vulnerabilities.").
-							WithSourceMap(dag.SourceMap("govulncheck.go", 10, 1)).
+							WithDescription("Govulncheck scans every module in the Go workspace for known vulnerabilities.\n\nThe scan is cached until the source, the toolchain or the vulnerability\ndatabase changes.").
+							WithCachePolicy(dagger.FunctionCachePolicyNever).
+							WithSourceMap(dag.SourceMap("govulncheck.go", 20, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("Prepare",

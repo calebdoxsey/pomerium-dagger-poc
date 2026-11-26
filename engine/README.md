@@ -1,0 +1,143 @@
+# Self-hosted Dagger engine for CI
+
+GitHub-hosted runners start every job with an empty Dagger engine, so nothing is
+cached between CI runs. This directory sets up a single long-lived engine on
+Kubernetes, with a persistent volume for its cache, that CI connects to over
+mutual TLS.
+
+```
+GitHub-hosted runner ── tls://HOST:1234 (client cert) ──▶ LoadBalancer ──▶ engine pod (StatefulSet + PVC)
+```
+
+| File | Purpose |
+| --- | --- |
+| `values.yaml` | Values for the official Dagger Helm chart |
+| `gen-certs.sh` | Generates the CA, server and client certificates |
+| `networkpolicy.yaml` | Example NetworkPolicy restricting what CI jobs can reach |
+
+Why not run the CI runners in the cluster (Actions Runner Controller) and share
+an engine per node, as Dagger recommends? Pomerium's repositories are public, and
+self-hosted runners would run code from fork pull requests on our
+infrastructure.
+
+## Setup
+
+### 1. Nodes
+
+Run the engine on dedicated nodes with fast local disks. Label and taint a node
+pool, then uncomment `nodeSelector` and `tolerations` in `values.yaml` to match.
+
+### 2. Certificates
+
+```sh
+./gen-certs.sh dagger-engine.example.com ./certs
+kubectl create namespace dagger
+kubectl -n dagger create secret generic dagger-engine-tls \
+  --from-file=./certs/tls.crt --from-file=./certs/tls.key --from-file=./certs/ca.crt
+```
+
+Pass the hostname CI will connect to; the server certificate is only valid for
+that name. Keep `ca.key` offline, since it is only needed to issue new
+certificates. Never commit `certs/`.
+
+### 3. Engine
+
+```sh
+helm upgrade --install --namespace dagger checks oci://registry.dagger.io/dagger-helm \
+  --version 1.0.0-beta.30 -f values.yaml
+kubectl -n dagger rollout status statefulset/checks-dagger-helm-engine
+```
+
+This creates:
+
+- a one-replica StatefulSet with a 200Gi PersistentVolumeClaim for the cache;
+- a `LoadBalancer` Service named `checks-dagger-helm` on port 1234.
+
+The engine prunes its cache at 75% of the disk by default. To change that, set
+`engine.configJson`; see Dagger's `engine.json` reference.
+
+Point the hostname's DNS at the LoadBalancer address:
+
+```sh
+kubectl -n dagger get service checks-dagger-helm
+```
+
+### 4. Network policy
+
+Edit the placeholder CIDRs in `networkpolicy.yaml` to your cluster's pod and
+service ranges, then apply it:
+
+```sh
+kubectl apply -f networkpolicy.yaml
+```
+
+### 5. Verify
+
+From a machine with the client certificate:
+
+```sh
+DAGGER_ENGINE="tls://dagger-engine.example.com:1234?ca_path=certs/ca.crt&cert_path=certs/client.crt&key_path=certs/client.key" \
+  dagger check -l
+```
+
+A client without a valid certificate does not get an error: the CLI keeps
+retrying, and the engine logs `tls: client didn't provide a certificate`.
+
+### 6. GitHub configuration
+
+In each repository (or once for the organization), add:
+
+- Secrets: `DAGGER_ENGINE_CA` (`ca.crt`), `DAGGER_ENGINE_CLIENT_CERT`
+  (`client.crt`) and `DAGGER_ENGINE_CLIENT_KEY` (`client.key`).
+- Variable: `DAGGER_ENGINE_HOST`, the engine's hostname.
+
+Add this step to each workflow before the Dagger step, and set
+`timeout-minutes` on the job, because a rejected certificate hangs instead of
+failing:
+
+```yaml
+      - name: Use the shared Dagger engine
+        env:
+          CA: ${{ secrets.DAGGER_ENGINE_CA }}
+          CERT: ${{ secrets.DAGGER_ENGINE_CLIENT_CERT }}
+          KEY: ${{ secrets.DAGGER_ENGINE_CLIENT_KEY }}
+          HOST: ${{ vars.DAGGER_ENGINE_HOST }}
+        run: |
+          if [ -z "$CA" ]; then echo "No engine credentials (e.g. fork PR); using a local engine."; exit 0; fi
+          d="$RUNNER_TEMP/dagger-engine"; mkdir -p "$d"; umask 077
+          printf '%s\n' "$CA" > "$d/ca.crt"; printf '%s\n' "$CERT" > "$d/client.crt"; printf '%s\n' "$KEY" > "$d/client.key"
+          echo "DAGGER_ENGINE=tls://$HOST:1234?ca_path=$d/ca.crt&cert_path=$d/client.crt&key_path=$d/client.key" >> "$GITHUB_ENV"
+```
+
+Fork pull requests do not receive secrets. They skip this step and use a
+temporary local engine, as they would without this setup.
+
+## Upgrading Dagger
+
+The chart, the engine and the CLI must be the same version. The CLI version
+comes from `dagger` in each repository's `.tool-versions`. Upgrade the Helm
+release (`--version`) together with that change.
+
+## Security
+
+- **The engine is privileged.** Anyone with a client certificate can run
+  arbitrary privileged containers on its node. Keep it on dedicated nodes and
+  apply the NetworkPolicy, so CI jobs cannot reach in-cluster services or the
+  cloud metadata endpoint.
+- **Repository write access means engine access.** Anyone who can push a branch
+  can run a workflow that reads the client certificate. GitHub environments with
+  protection rules can narrow this, but they also block pull request branches.
+- **Shared cache volumes can be poisoned.** The Go module and build caches are
+  mutable and shared by every job. A malicious pull request could plant
+  build-cache entries that a later `main` or release build uses. Before release
+  builds use this setup, install a second Helm release (for example `trusted`)
+  used only by `main` and tags, so trusted and untrusted work never share a
+  cache.
+
+## Scaling
+
+Start with one engine and give it a larger node when it gets slow. Each engine
+has its own cache. To add engines, either give a check its own Helm release
+(and runner configuration), or put several engines behind a Service with
+`sessionAffinity: ClientIP`, because one CLI session opens several connections
+that must reach the same engine.

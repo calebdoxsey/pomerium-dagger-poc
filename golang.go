@@ -23,6 +23,9 @@ func (m *Pomerium) GoBase(ctx context.Context) (*dagger.Container, error) {
 }
 
 func (m *Pomerium) goContainer(ctx context.Context, source *dagger.Directory) (*dagger.Container, error) {
+	if err := m.requireEngineVersion(ctx); err != nil {
+		return nil, err
+	}
 	goVersion, err := toolVersion(ctx, m.Source, "golang")
 	if err != nil {
 		return nil, err

@@ -1,0 +1,43 @@
+# Restrict the engine pod's network. Containers that the engine runs share the
+# pod's network, so this also applies to every CI job.
+#
+# Before applying, replace the placeholder CIDRs with your cluster's pod and
+# service ranges. The pod selector matches a Helm release named "checks".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dagger-engine
+  namespace: dagger
+spec:
+  podSelector:
+    matchLabels:
+      name: checks-dagger-helm-engine
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # CI connects through the LoadBalancer. Access is controlled by mutual TLS.
+    - ports:
+        - protocol: TCP
+          port: 1234
+  egress:
+    # DNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The internet (registries, Go module proxy, vuln.go.dev, ...), but not the
+    # cluster or the cloud metadata service.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8 # REPLACE: pod CIDR
+              - 10.96.0.0/12 # REPLACE: service CIDR
+              - 169.254.169.254/32 # cloud metadata
