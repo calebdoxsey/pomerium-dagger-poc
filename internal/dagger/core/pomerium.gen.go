@@ -41,9 +41,6 @@ func (r *Pomerium) withLoadedID(q *querybuilder.Selection, id ID) *Pomerium {
 }
 
 // BuildDocker builds the repository's Dockerfile, without publishing the image.
-//
-// The engine's BuildKit runs the build, so its layers and the Dockerfile's
-// cache mounts stay on the engine between runs.
 func (r *Pomerium) BuildDocker(ctx context.Context) error {
 	if r.buildDocker != nil {
 		return nil
@@ -69,6 +66,33 @@ func (r *Pomerium) Cover() *File {
 	q := r.query.Select("cover")
 
 	return &File{
+		query:     q,
+		refetchID: r.refetchID,
+	}
+}
+
+// PomeriumDockerImageOpts contains options for Pomerium.DockerImage
+type PomeriumDockerImageOpts struct {
+	// Platform to build, such as linux/arm64. Defaults to the engine's.
+	Platform Platform
+}
+
+// DockerImage builds the repository's Dockerfile and returns the image.
+//
+// The engine's BuildKit runs the build, so its layers and the Dockerfile's
+// cache mounts stay on the engine between runs.
+//
+// The source has no .git, so the binary's version and commit are empty.
+func (r *Pomerium) DockerImage(opts ...PomeriumDockerImageOpts) *Container {
+	q := r.query.Select("dockerImage")
+	for i := len(opts) - 1; i >= 0; i-- {
+		// `platform` optional argument
+		if !querybuilder.IsZeroValue(opts[i].Platform) {
+			q = q.Arg("platform", opts[i].Platform)
+		}
+	}
+
+	return &Container{
 		query:     q,
 		refetchID: r.refetchID,
 	}

@@ -8,3 +8,6 @@ import (
 
 // Pomerium is the root object of the module.
 type Pomerium = core.Pomerium
+
+// PomeriumDockerImageOpts contains options for Pomerium.DockerImage
+type PomeriumDockerImageOpts = core.PomeriumDockerImageOpts

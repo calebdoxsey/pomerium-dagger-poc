@@ -194,6 +194,20 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
 			}
 			return (*Pomerium).Cover(&parent, ctx)
+		case "DockerImage":
+			var parent Pomerium
+			err = json.Unmarshal(parentJSON, &parent)
+			if err != nil {
+				panic(fmt.Errorf("%s: %w", "failed to unmarshal parent object", err))
+			}
+			var platform dagger.Platform
+			if inputArgs["platform"] != nil {
+				err = json.Unmarshal([]byte(inputArgs["platform"]), &platform)
+				if err != nil {
+					panic(fmt.Errorf("%s: %w", "failed to unmarshal input arg platform", err))
+				}
+			}
+			return (*Pomerium).DockerImage(&parent, ctx, platform)
 		case "GoBase":
 			var parent Pomerium
 			err = json.Unmarshal(parentJSON, &parent)
@@ -254,8 +268,8 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 					WithFunction(
 						dag.Function("BuildDocker",
 							dag.TypeDef().WithKind(dagger.TypeDefKindVoidKind).WithOptional(true)).
-							WithDescription("BuildDocker builds the repository's Dockerfile, without publishing the image.\n\nThe engine's BuildKit runs the build, so its layers and the Dockerfile's\ncache mounts stay on the engine between runs.").
-							WithSourceMap(dag.SourceMap("docker.go", 13, 1)).
+							WithDescription("BuildDocker builds the repository's Dockerfile, without publishing the image.").
+							WithSourceMap(dag.SourceMap("docker.go", 30, 1)).
 							WithCheck()).
 					WithFunction(
 						dag.Function("BuildWindows",
@@ -268,6 +282,12 @@ func invoke(ctx context.Context, parentJSON []byte, parentName string, fnName st
 							dag.TypeDef().WithObject("File")).
 							WithDescription("Cover runs the Go tests like Test and returns the coverage profile.").
 							WithSourceMap(dag.SourceMap("test.go", 23, 1))).
+					WithFunction(
+						dag.Function("DockerImage",
+							dag.TypeDef().WithObject("Container")).
+							WithDescription("DockerImage builds the repository's Dockerfile and returns the image.\n\nThe engine's BuildKit runs the build, so its layers and the Dockerfile's\ncache mounts stay on the engine between runs.\n\nThe source has no .git, so the binary's version and commit are empty.").
+							WithSourceMap(dag.SourceMap("docker.go", 15, 1)).
+							WithArg("platform", dag.TypeDef().WithScalar("Platform").WithOptional(true), dagger.FunctionWithArgOpts{Description: "Platform to build, such as linux/arm64. Defaults to the engine's.", SourceMap: dag.SourceMap("docker.go", 19, 2)})).
 					WithFunction(
 						dag.Function("GoBase",
 							dag.TypeDef().WithObject("Container")).
